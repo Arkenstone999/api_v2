@@ -1,0 +1,26 @@
+[project]
+name = "crewsastosparksql"
+version = "0.1.0"
+description = "CrewSasToSparkSql using crewAI"
+authors = [{ name = "Sasteamzer", email = "charles.frelet@amaris.com" }]
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "crewai[tools]>=0.203.0,<1.0.0",
+    "python-dotenv>=1.0.0",
+    "pyyaml>=6.0",
+    "pydantic>=2.0.0",
+    "langfuse>=2.0.0,<3.0.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "python-multipart>=0.0.12",
+]
+
+[project.scripts]
+crewsastosparksql = "crewsastosparksql.main:run"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.crewai]
+type = "crew"

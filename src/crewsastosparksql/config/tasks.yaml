@@ -1,0 +1,166 @@
+analyze_sas:
+  description: |
+    Analyze the SAS code to understand structure and complexity.
+
+    INPUT FILE: {sas_file_path}
+    JOB NAME: {job_name}
+
+    Use file_reader to read the SAS file at {sas_file_path} and identify:
+    - DATA steps and PROC steps with inputs/outputs
+    - Macros and dependencies
+    - Data flow between steps
+    - Complexity score (1-10: simple filtering=1-3, multiple steps=4-6, heavy macros=7-8, advanced stats=9-10)
+    - Data patterns (value ranges, cardinalities, typical row counts for test generation)
+
+    Document everything downstream agents need:
+    - Flag ambiguous logic for platform_architect
+    - Detailed data patterns for test_engineer
+    - SAS-specific features that need special handling
+
+    Use file_writer to save your analysis as JSON to: jobs/{job_name}/tasks/analyze_sas/analysis.json
+  expected_output: "JSON file with complete code structure, data flow, complexity score with justification, data patterns, and flags for downstream agents."
+  agent: sas_analyst
+
+decide_platform:
+  description: |
+    MANDATORY: You MUST use file_writer tool to create the decision file. Do not just return text.
+
+    STEP 1: Use file_reader to read: jobs/{job_name}/tasks/analyze_sas/analysis.json
+
+    STEP 2: If analysis has ambiguous flags OR complexity = 5:
+    - Use call_agent(agent_name='sas_analyst', question='Ask specific clarification about the ambiguous logic or data patterns')
+    - Wait for response and incorporate into decision
+
+    STEP 3: Analyze complexity score and decide platform:
+    - SQL if: Complexity ≤ 4, simple set-based operations, standard aggregations
+    - PySpark if: Complexity ≥ 6, complex transformations, heavy macros, or large data volumes
+    - Complexity = 5 (borderline): Choose SQL for simple multi-step logic, PySpark if data-intensive or has macros
+
+    STEP 4: Create a JSON decision with this structure:
+    {{
+      "platform_choice": "SQL" or "PySpark",
+      "justifications": ["reason 1", "reason 2", "reason 3", "reason 4"],
+      "implementation_guidance": "detailed instructions for code_translator",
+      "clarifications_from_analyst": "summary of any clarifications received"
+    }}
+
+    STEP 5: REQUIRED - Use file_writer tool with these EXACT parameters:
+    - file_path: jobs/{job_name}/tasks/decide_platform/decision.json
+    - content: json.dumps(your_decision_dict)
+    - agent_name: platform_architect
+
+    YOU MUST CALL file_writer TOOL. Task is NOT complete until file is written.
+  expected_output: "JSON file written to jobs/{job_name}/tasks/decide_platform/decision.json containing platform_choice, justifications, and implementation_guidance."
+  agent: platform_architect
+  context: [analyze_sas]
+
+translate_code:
+  description: |
+    MANDATORY: You MUST use file_writer tool to create the code file. Do not just return text.
+
+    STEP 1: Read inputs using file_reader:
+    - {sas_file_path}
+    - jobs/{job_name}/tasks/decide_platform/decision.json
+    - jobs/{job_name}/tasks/analyze_sas/analysis.json
+
+    STEP 2: If implementation_guidance is unclear OR you need clarification:
+    - Use call_agent(agent_name='platform_architect', question='Ask about specific implementation approach')
+    - If SAS logic is ambiguous, use call_agent(agent_name='sas_analyst', question='Ask about SAS behavior')
+
+    STEP 3: Generate complete, executable code based on platform_choice from decision.json:
+    - For SQL: CTEs, window functions, ANSI SQL standard
+    - For PySpark: DataFrame API, explicit schemas, caching
+
+    Include: imports/setup, schemas, transformation logic, comments, usage example
+
+    STEP 4: REQUIRED - Use file_writer tool:
+    - If SQL: file_path = jobs/{job_name}/tasks/translate_code/{job_name}.sql
+    - If PySpark: file_path = jobs/{job_name}/tasks/translate_code/{job_name}.py
+    - content = your_generated_code
+    - agent_name = code_translator
+
+    YOU MUST CALL file_writer TOOL. Task is NOT complete until file is written.
+  expected_output: "Code file (.sql or .py) written to jobs/{job_name}/tasks/translate_code/ with complete implementation."
+  agent: code_translator
+  context: [analyze_sas, decide_platform]
+
+test_and_validate:
+  description: |
+    MANDATORY: Execute and validate the generated code using allow_code_execution capability.
+
+    STEP 1: Read inputs using file_reader:
+    - jobs/{job_name}/tasks/analyze_sas/analysis.json to understand data structure and patterns
+    - jobs/{job_name}/tasks/decide_platform/decision.json to know which code to test (SQL or PySpark)
+    - jobs/{job_name}/tasks/translate_code/ to get the generated code file (.py or .sql)
+
+    STEP 2: Generate 3 test data files using file_writer (each as JSON array of input records):
+
+    1. Baseline test: 10-15 rows with typical values matching the schema from analysis.json
+       Output: jobs/{job_name}/tasks/test_and_validate/test_baseline.json
+
+    2. Edge cases: nulls, boundaries, extreme values, empty strings
+       Output: jobs/{job_name}/tasks/test_and_validate/test_edges.json
+
+    3. Stress test: 50 rows with varied realistic data
+       Output: jobs/{job_name}/tasks/test_and_validate/test_stress.json
+
+    If data patterns unclear, use call_agent to ask sas_analyst about value ranges or data types.
+
+    STEP 3: EXECUTE THE CODE with each test dataset:
+    - For PySpark code: Use your code execution capability to run the .py file
+    - For SQL code: Use your code execution capability to validate SQL syntax
+    - Capture any errors or exceptions
+    - Note: Code may reference input paths that don't exist - this is expected, document the behavior
+
+    STEP 4: Create validation report JSON using file_writer with:
+    - verdict: "PASS" (code executed without critical errors) or "FAIL" (execution failed)
+    - test_summary: describe each test scenario and what was tested
+    - execution_results: for each test file, document if code executed, any errors encountered, and observations
+    - data_coverage: list what patterns were tested (nulls, boundaries, typical values, etc)
+    - test_files_created: array of the 3 test file paths
+    - recommendations: any gaps in test coverage or code issues found
+    - code_quality_notes: observations about the generated code structure and completeness
+
+    Output: jobs/{job_name}/tasks/test_and_validate/validation_report.json
+
+    YOU MUST CREATE ALL 4 FILES (3 test data + 1 validation report) using file_writer tool.
+  expected_output: "Validation report JSON with execution results plus 3 test data files (test_baseline.json, test_edges.json, test_stress.json)."
+  agent: test_engineer
+  context: [analyze_sas, decide_platform, translate_code]
+
+review_and_approve:
+  description: |
+    MANDATORY: You MUST use file_writer tool to create the final approval. Do not just return text.
+
+    STEP 1: Read all outputs using file_reader:
+    - jobs/{job_name}/tasks/analyze_sas/analysis.json
+    - jobs/{job_name}/tasks/decide_platform/decision.json
+    - jobs/{job_name}/tasks/translate_code/ (check for .sql or .py)
+    - jobs/{job_name}/tasks/test_and_validate/validation_report.json
+
+    STEP 2: If test verdict is FAIL or you find critical issues:
+    - Use call_agent(agent_name='test_engineer', question='Ask about specific test failures and their severity')
+    - Use call_agent(agent_name='code_translator', question='Request fixes for identified issues')
+    - If platform choice seems wrong, use call_agent(agent_name='platform_architect', question='Challenge the platform decision with your findings')
+
+    STEP 3: If code quality issues found:
+    - Use call_agent(agent_name='code_translator', question='Ask for specific improvements or refactoring')
+
+    STEP 4: Create final approval JSON with this structure:
+    {{
+      "approval_status": "APPROVED" or "REJECTED",
+      "quality_assessment": "summary",
+      "issues_found": [],
+      "sign_off": "statement",
+      "collaboration_summary": "summary of all agent interactions during review"
+    }}
+
+    STEP 5: REQUIRED - Use file_writer tool:
+    - file_path: jobs/{job_name}/tasks/review_and_approve/final_approval.json
+    - content: json.dumps(your_approval_dict)
+    - agent_name: code_reviewer
+
+    YOU MUST CALL file_writer TOOL. Task is NOT complete until file is written.
+  expected_output: "JSON file written to jobs/{job_name}/tasks/review_and_approve/final_approval.json with approval status and assessment."
+  agent: code_reviewer
+  context: [analyze_sas, decide_platform, translate_code, test_and_validate]
