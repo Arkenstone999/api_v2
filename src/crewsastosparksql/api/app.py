@@ -17,6 +17,8 @@ from crewsastosparksql.api.models import (
     ErrorResponse,
 )
 from crewsastosparksql.api.job_manager import JobManager
+from crewsastosparksql.api.database import init_db
+from crewsastosparksql.api import routes_projects, routes_tasks, routes_dashboard
 
 # Load environment variables
 load_dotenv()
@@ -46,6 +48,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include routers
+app.include_router(routes_projects.router)
+app.include_router(routes_tasks.router)
+app.include_router(routes_dashboard.router)
+
 # Initialize job manager
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 UPLOAD_DIR = PROJECT_ROOT / "uploads"
@@ -60,6 +67,11 @@ async def startup_event():
     logger.info("Starting CrewSasToSparkSql API")
     logger.info(f"Project root: {PROJECT_ROOT}")
     logger.info(f"Upload directory: {UPLOAD_DIR}")
+
+    # Initialize database
+    logger.info("Initializing database...")
+    init_db()
+    logger.info("Database initialized successfully")
 
 
 @app.get("/")

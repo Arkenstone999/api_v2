@@ -1,0 +1,46 @@
+Available API Endpoints
+
+  Projects:
+  - POST /api/projects - Create project
+  - GET /api/projects - List all projects
+  - GET /api/projects/{id} - Get project details
+  - PATCH /api/projects/{id} - Update project
+  - DELETE /api/projects/{id} - Delete project
+  - POST /api/projects/{id}/files - Upload SAS files
+  - GET /api/projects/{id}/workflow - Get workflow steps
+  - PATCH /api/projects/{id}/workflow/{step_id} - Update workflow step
+
+  Tasks:
+  - GET /api/projects/{id}/tasks - List tasks
+  - GET /api/projects/{id}/tasks/{task_id} - Get task details
+  - PATCH /api/projects/{id}/tasks/{task_id} - Update task
+  - POST /api/projects/{id}/tasks/{task_id}/regenerate - Regenerate conversion
+
+  Comments:
+  - GET /api/tasks/{task_id}/comments - Get comments
+  - POST /api/tasks/{task_id}/comments - Add comment
+  - PATCH /api/comments/{id} - Mark comment resolved
+
+  Dashboard:
+  - GET /api/dashboard/stats - Get statistics
+
+  ---
+  Tested & Working
+
+  All endpoints were tested successfully:
+  - ✅ Created project with metadata
+  - ✅ Uploaded SAS file
+  - ✅ Auto-created 6 workflow steps
+  - ✅ Created conversion task from file
+  - ✅ Added comment to task
+  - ✅ Retrieved dashboard stats
+  - ✅ Database persistence working
+
+  ---
+  How to Run
+
+  # Start the server
+  .venv/bin/python -m uvicorn crewsastosparksql.api.app:app --host 0.0.0.0 --port 8000
+
+  # API documentation available at:
+  # http://localhost:8000/docs
