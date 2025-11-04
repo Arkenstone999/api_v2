@@ -1,4 +1,3 @@
-"""FastAPI application for CrewSasToSparkSql service."""
 import os
 import logging
 from pathlib import Path
@@ -8,67 +7,37 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from crewsastosparksql.api.models import (
-    JobSubmitResponse,
-    JobStatusResponse,
-    JobResultsResponse,
-    JobListItem,
-    JobStatus,
-    ErrorResponse,
-)
+from crewsastosparksql.api.models import JobSubmitResponse, JobStatusResponse, JobResultsResponse, JobListItem, JobStatus, ErrorResponse
 from crewsastosparksql.api.job_manager import JobManager
 from crewsastosparksql.api.database import init_db
-from crewsastosparksql.api import routes_projects, routes_tasks, routes_dashboard
+from crewsastosparksql.api import routes_projects, routes_tasks, routes_dashboard, routes_auth
 
-# Load environment variables
 load_dotenv()
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app
-app = FastAPI(
-    title="CrewSasToSparkSql API",
-    description="AI-powered SAS to SQL/PySpark translation service using CrewAI",
-    version="0.1.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-)
+app = FastAPI(title="CrewSasToSparkSql API", description="AI-powered SAS to SQL/PySpark translation", version="0.1.0", docs_url="/docs", redoc_url="/redoc")
 
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# Include routers
+app.include_router(routes_auth.router)
 app.include_router(routes_projects.router)
 app.include_router(routes_tasks.router)
 app.include_router(routes_dashboard.router)
 
-# Initialize job manager
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 UPLOAD_DIR = PROJECT_ROOT / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
-
 job_manager = JobManager(output_dir=str(PROJECT_ROOT))
 
 
 @app.on_event("startup")
 async def startup_event():
-    """Application startup."""
     logger.info("Starting CrewSasToSparkSql API")
     logger.info(f"Project root: {PROJECT_ROOT}")
     logger.info(f"Upload directory: {UPLOAD_DIR}")
-
-    # Initialize database
     logger.info("Initializing database...")
     init_db()
     logger.info("Database initialized successfully")
@@ -76,18 +45,11 @@ async def startup_event():
 
 @app.get("/")
 async def root():
-    """Root endpoint."""
-    return {
-        "service": "CrewSasToSparkSql API",
-        "version": "0.1.0",
-        "status": "running",
-        "docs": "/docs"
-    }
+    return {"service": "CrewSasToSparkSql API", "version": "0.1.0", "status": "running", "docs": "/docs"}
 
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
     return {"status": "healthy"}
 
 

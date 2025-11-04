@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 from crewai import Agent, Crew, Process, Task, LLM
 from crewsastosparksql.tools.file_writer import FileWriterTool
 from crewsastosparksql.tools.file_reader import FileReaderTool
-from crewsastosparksql.tools.call_agent import CallAgentTool
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -38,12 +37,10 @@ class Crewsastosparksql:
 
         file_writer = FileWriterTool(base_dir=self.output_dir)
         file_reader = FileReaderTool()
-        call_agent = CallAgentTool()
 
         tools_map = {
             "file_writer": file_writer,
             "file_reader": file_reader,
-            "call_agent": call_agent,
         }
 
         config_dir = os.path.join(os.path.dirname(__file__), "config")

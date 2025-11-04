@@ -1,4 +1,3 @@
-"""SQLAlchemy database models."""
 from datetime import datetime
 from sqlalchemy import Column, String, Integer, DateTime, Text, ForeignKey, Boolean, Enum as SQLEnum
 from sqlalchemy.orm import relationship
@@ -8,7 +7,6 @@ from crewsastosparksql.api.database import Base
 
 
 class ProjectStatus(str, enum.Enum):
-    """Project status enum."""
     ANALYZING = "analyzing"
     READY = "ready"
     CONVERTING = "converting"
@@ -17,19 +15,16 @@ class ProjectStatus(str, enum.Enum):
 
 
 class SourceType(str, enum.Enum):
-    """Source type enum."""
     SAS_CODE = "sas-code"
     SAS_EG = "sas-eg"
 
 
 class TargetType(str, enum.Enum):
-    """Target type enum."""
     SQL = "sql"
     PYSPARK = "pyspark"
 
 
 class TaskStatus(str, enum.Enum):
-    """Task status enum."""
     PENDING = "pending"
     CONVERTING = "converting"
     CONVERTED = "converted"
@@ -38,10 +33,10 @@ class TaskStatus(str, enum.Enum):
 
 
 class Project(Base):
-    """Project model."""
     __tablename__ = "projects"
 
     id = Column(String, primary_key=True, index=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
     name = Column(String, nullable=False)
     description = Column(Text, nullable=False)
     status = Column(SQLEnum(ProjectStatus), default=ProjectStatus.ANALYZING, nullable=False)
@@ -53,13 +48,13 @@ class Project(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
-    # Relationships
+    owner = relationship("User", back_populates="projects")
     tasks = relationship("ConversionTask", back_populates="project", cascade="all, delete-orphan")
     workflow_steps = relationship("WorkflowStep", back_populates="project", cascade="all, delete-orphan")
 
 
 class ConversionTask(Base):
-    """Conversion task model."""
+    
     __tablename__ = "conversion_tasks"
 
     id = Column(String, primary_key=True, index=True)
@@ -73,13 +68,12 @@ class ConversionTask(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
-    # Relationships
     project = relationship("Project", back_populates="tasks")
     comments = relationship("Comment", back_populates="task", cascade="all, delete-orphan")
 
 
 class Comment(Base):
-    """Comment model."""
+    
     __tablename__ = "comments"
 
     id = Column(String, primary_key=True, index=True)
@@ -90,12 +84,11 @@ class Comment(Base):
     resolved = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    # Relationships
     task = relationship("ConversionTask", back_populates="comments")
 
 
 class WorkflowStep(Base):
-    """Workflow step model."""
+    
     __tablename__ = "workflow_steps"
 
     id = Column(String, primary_key=True, index=True)
@@ -107,5 +100,36 @@ class WorkflowStep(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
-    # Relationships
     project = relationship("Project", back_populates="workflow_steps")
+
+
+class User(Base):
+    
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True, index=True)
+    email = Column(String, unique=True, nullable=False, index=True)
+    hashed_password = Column(String, nullable=False)
+    full_name = Column(String, nullable=True)
+    api_key = Column(String, unique=True, nullable=False, index=True)
+    monthly_request_limit = Column(Integer, default=1000, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    projects = relationship("Project", back_populates="owner", cascade="all, delete-orphan")
+    usage_records = relationship("Usage", back_populates="user", cascade="all, delete-orphan")
+
+
+class Usage(Base):
+    
+    __tablename__ = "usage"
+
+    id = Column(String, primary_key=True, index=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    year = Column(Integer, nullable=False)
+    month = Column(Integer, nullable=False)
+    request_count = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    user = relationship("User", back_populates="usage_records")
