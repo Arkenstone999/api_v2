@@ -58,29 +58,39 @@ translate_code:
   description: |
     MANDATORY: You MUST use file_writer tool to create the code file. Do not just return text.
 
-    STEP 1: Read inputs using file_reader:
-    - {sas_file_path}
+    STEP 1: Read decision.json FIRST using file_reader:
     - jobs/{job_name}/tasks/decide_platform/decision.json
+    - Extract the "platform_choice" value (either "SQL" or "PySpark")
+    - This determines EVERYTHING about your output
+
+    STEP 2: Read additional inputs using file_reader:
+    - {sas_file_path}
     - jobs/{job_name}/tasks/analyze_sas/analysis.json
 
-    STEP 2: If implementation_guidance is unclear OR you need clarification:
+    STEP 3: If implementation_guidance is unclear OR you need clarification:
     - Use call_agent(agent_name='platform_architect', question='Ask about specific implementation approach')
     - If SAS logic is ambiguous, use call_agent(agent_name='sas_analyst', question='Ask about SAS behavior')
 
-    STEP 3: Generate complete, executable code based on platform_choice from decision.json:
-    - For SQL: CTEs, window functions, ANSI SQL standard
-    - For PySpark: DataFrame API, explicit schemas, caching
+    STEP 4: Generate code MATCHING the platform_choice:
+    - If platform_choice == "SQL": Generate ONLY SQL code (CTEs, window functions, ANSI SQL standard)
+    - If platform_choice == "PySpark": Generate ONLY PySpark code (DataFrame API, explicit schemas, caching)
+    - NEVER generate SQL when PySpark is chosen or vice versa
 
     Include: imports/setup, schemas, transformation logic, comments, usage example
 
-    STEP 4: REQUIRED - Use file_writer tool:
-    - If SQL: file_path = jobs/{job_name}/tasks/translate_code/{job_name}.sql
-    - If PySpark: file_path = jobs/{job_name}/tasks/translate_code/{job_name}.py
-    - content = your_generated_code
-    - agent_name = code_translator
+    STEP 5: Determine file extension based on platform_choice:
+    - If platform_choice == "SQL": file_extension = ".sql"
+    - If platform_choice == "PySpark": file_extension = ".py"
 
+    STEP 6: REQUIRED - Use file_writer tool with EXACT file path:
+    - file_path: jobs/{job_name}/tasks/translate_code/{job_name}<file_extension>
+    - Replace <file_extension> with the value from STEP 5
+    - content: your_generated_code (must match platform_choice)
+    - agent_name: code_translator
+
+    CRITICAL: File extension MUST match platform_choice. SQL -> .sql, PySpark -> .py
     YOU MUST CALL file_writer TOOL. Task is NOT complete until file is written.
-  expected_output: "Code file (.sql or .py) written to jobs/{job_name}/tasks/translate_code/ with complete implementation."
+  expected_output: "Code file (.sql or .py) written to jobs/{job_name}/tasks/translate_code/ with complete implementation matching platform_choice."
   agent: code_translator
   context: [analyze_sas, decide_platform]
 
@@ -90,8 +100,9 @@ test_and_validate:
 
     STEP 1: Read inputs using file_reader:
     - jobs/{job_name}/tasks/analyze_sas/analysis.json to understand data structure and patterns
-    - jobs/{job_name}/tasks/decide_platform/decision.json to know which code to test (SQL or PySpark)
-    - jobs/{job_name}/tasks/translate_code/ to get the generated code file (.py or .sql)
+    - jobs/{job_name}/tasks/decide_platform/decision.json to extract "platform_choice"
+    - If platform_choice == "SQL": Read jobs/{job_name}/tasks/translate_code/{job_name}.sql
+    - If platform_choice == "PySpark": Read jobs/{job_name}/tasks/translate_code/{job_name}.py
 
     STEP 2: Generate 3 test data files using file_writer (each as JSON array of input records):
 
@@ -134,8 +145,9 @@ review_and_approve:
 
     STEP 1: Read all outputs using file_reader:
     - jobs/{job_name}/tasks/analyze_sas/analysis.json
-    - jobs/{job_name}/tasks/decide_platform/decision.json
-    - jobs/{job_name}/tasks/translate_code/ (check for .sql or .py)
+    - jobs/{job_name}/tasks/decide_platform/decision.json (extract "platform_choice")
+    - If platform_choice == "SQL": Read jobs/{job_name}/tasks/translate_code/{job_name}.sql
+    - If platform_choice == "PySpark": Read jobs/{job_name}/tasks/translate_code/{job_name}.py
     - jobs/{job_name}/tasks/test_and_validate/validation_report.json
 
     STEP 2: If test verdict is FAIL or you find critical issues:

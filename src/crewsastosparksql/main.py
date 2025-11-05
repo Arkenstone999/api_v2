@@ -4,6 +4,7 @@ import yaml
 import logging
 from datetime import datetime
 from crewsastosparksql.crew import Crewsastosparksql
+from crewsastosparksql.validation import TaskValidator
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -62,14 +63,51 @@ def run() -> None:
         "current_year": str(datetime.now().year),
     }
 
-    try:
-        crew = Crewsastosparksql(output_dir=project_root)
-        result = crew.crew().kickoff(inputs=inputs)
-        logger.info("Workflow completed successfully")
-        print(result)
-    except Exception as e:
-        logger.exception(f"Workflow failed: {e}")
-        sys.exit(1)
+    max_retries = 2
+    result = None
+
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Running workflow (attempt {attempt + 1}/{max_retries})")
+
+            crew = Crewsastosparksql(output_dir=project_root)
+            result = crew.crew().kickoff(inputs=inputs)
+
+            validator = TaskValidator(project_root, job_name)
+            validation_results = validator.validate_all()
+
+            failed_tasks = [task for task, success in validation_results.items() if not success]
+
+            if not failed_tasks:
+                logger.info("All tasks validated successfully")
+                print(result)
+                return
+
+            logger.warning(f"Tasks failed validation: {failed_tasks}")
+
+            if "translate_code" in failed_tasks:
+                logger.info("Attempting to fix translate_code file path issue")
+                if validator.fix_translate_code():
+                    validation_results["translate_code"] = True
+                    failed_tasks.remove("translate_code")
+
+            if not failed_tasks:
+                logger.info("All tasks validated after fixes")
+                print(result)
+                return
+
+            if attempt < max_retries - 1:
+                logger.warning(f"Retrying workflow due to failed tasks: {failed_tasks}")
+            else:
+                logger.error(f"Tasks failed validation after all retries: {failed_tasks}")
+                sys.exit(1)
+
+        except Exception as e:
+            if attempt < max_retries - 1:
+                logger.warning(f"Workflow failed (attempt {attempt + 1}): {e}")
+            else:
+                logger.exception(f"Workflow failed after all retries: {e}")
+                sys.exit(1)
 
 
 if __name__ == "__main__":

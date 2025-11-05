@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from crewsastosparksql.api.models import JobStatus
 from crewsastosparksql.crew import Crewsastosparksql
 from crewsastosparksql.main import ensure_task_dirs
+from crewsastosparksql.validation import TaskValidator
 
 logger = logging.getLogger(__name__)
 
@@ -91,21 +92,57 @@ class JobManager:
 
     def _run_crew(self, job: JobInfo) -> str:
         """Execute the crew workflow (runs in thread pool)."""
-        # Initialize directories
         ensure_task_dirs(self.output_dir, job.job_name)
 
-        # Prepare inputs
         inputs = {
             "sas_file_path": job.sas_file_path,
             "job_name": job.job_name,
             "current_year": str(datetime.now().year),
         }
 
-        # Run crew
-        crew = Crewsastosparksql(output_dir=self.output_dir)
-        result = crew.crew().kickoff(inputs=inputs)
+        max_retries = 2
+        result = None
 
-        return str(result)
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Running crew for job {job.job_name} (attempt {attempt + 1}/{max_retries})")
+
+                crew = Crewsastosparksql(output_dir=self.output_dir)
+                result = crew.crew().kickoff(inputs=inputs)
+
+                validator = TaskValidator(self.output_dir, job.job_name)
+                validation_results = validator.validate_all()
+
+                failed_tasks = [task for task, success in validation_results.items() if not success]
+
+                if not failed_tasks:
+                    logger.info(f"All tasks validated successfully for job {job.job_name}")
+                    return str(result)
+
+                logger.warning(f"Tasks failed validation: {failed_tasks}")
+
+                if "translate_code" in failed_tasks:
+                    logger.info("Attempting to fix translate_code file path issue")
+                    if validator.fix_translate_code():
+                        validation_results["translate_code"] = True
+                        failed_tasks.remove("translate_code")
+
+                if not failed_tasks:
+                    logger.info(f"All tasks validated after fixes for job {job.job_name}")
+                    return str(result)
+
+                if attempt < max_retries - 1:
+                    logger.warning(f"Retrying crew execution due to failed tasks: {failed_tasks}")
+                else:
+                    raise Exception(f"Tasks failed validation after all retries: {failed_tasks}")
+
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"Crew execution failed (attempt {attempt + 1}): {e}")
+                else:
+                    raise
+
+        return str(result) if result else "Crew execution completed with warnings"
 
     def get_job_results(self, job_id: str) -> Optional[Dict]:
         """Get job results including task outputs."""

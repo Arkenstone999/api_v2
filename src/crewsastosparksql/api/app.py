@@ -17,7 +17,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="CrewSasToSparkSql API", description="AI-powered SAS to SQL/PySpark translation", version="0.1.0", docs_url="/docs", redoc_url="/redoc")
+app = FastAPI(title="API, La v_3 !", description="Authentification et rate limiting !", version="0.1.0", docs_url="/docs", redoc_url="/redoc")
 
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
 app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])

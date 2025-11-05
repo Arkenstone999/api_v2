@@ -25,17 +25,21 @@ Available API Endpoints
   - GET /api/dashboard/stats - Get statistics
 
   ---
-  Tested & Working
+  How It Works
 
-  All endpoints were tested successfully:
-  - ✅ Created project with metadata
-  - ✅ Uploaded SAS file
-  - ✅ Auto-created 6 workflow steps
-  - ✅ Created conversion task from file
-  - ✅ Added comment to task
-  - ✅ Retrieved dashboard stats
-  - ✅ Database persistence working
-
+  Crew Executes
+      ↓
+  Validate All Task Outputs
+      ↓
+  Any Failed? → Yes → translate_code failed?
+      ↓                    ↓
+      No                  Yes → Auto-fix (rename file)
+      ↓                    ↓
+  Success               Fixed? → Yes → Success
+                          ↓
+                         No → Retry Entire Crew (up to 2 times)
+                          ↓
+                      Still Failed? → Log Error, Mark Job Failed
   ---
   How to Run
 

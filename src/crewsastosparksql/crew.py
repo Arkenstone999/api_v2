@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from crewai import Agent, Crew, Process, Task, LLM
 from crewsastosparksql.tools.file_writer import FileWriterTool
 from crewsastosparksql.tools.file_reader import FileReaderTool
+from crewsastosparksql.tools.call_agent import CallAgentTool
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -35,20 +36,25 @@ class Crewsastosparksql:
         self.output_dir = output_dir or os.getcwd()
         logger.info(f"Initializing CrewAI workflow with output_dir: {self.output_dir}")
 
-        file_writer = FileWriterTool(base_dir=self.output_dir)
-        file_reader = FileReaderTool()
-
-        tools_map = {
-            "file_writer": file_writer,
-            "file_reader": file_reader,
-        }
-
         config_dir = os.path.join(os.path.dirname(__file__), "config")
         agents_cfg = load_yaml(os.path.join(config_dir, "agents.yaml"))
         tasks_cfg = load_yaml(os.path.join(config_dir, "tasks.yaml"))
 
-        logger.info(f"Loaded {len(agents_cfg)} agent configurations")
-        logger.info(f"Loaded {len(tasks_cfg)} task configurations")
+        file_writer = FileWriterTool(base_dir=self.output_dir)
+        file_reader = FileReaderTool()
+        call_agent = CallAgentTool(
+            base_dir=self.output_dir,
+            llm=llm,
+            agents_config=agents_cfg
+        )
+
+        tools_map = {
+            "file_writer": file_writer,
+            "file_reader": file_reader,
+            "call_agent": call_agent,
+        }
+
+        logger.info(f"Loaded {len(agents_cfg)} agents, {len(tasks_cfg)} tasks")
 
         self.agents_dict: dict[str, Agent] = {}
         for name, cfg in agents_cfg.items():
