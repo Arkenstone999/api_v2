@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Integer, DateTime, Text, ForeignKey, Boolean, Enum as SQLEnum
 from sqlalchemy.orm import relationship
 import enum
@@ -45,8 +45,8 @@ class Project(Base):
     progress = Column(Integer, default=0)
     file_count = Column(Integer, default=0)
     dependencies_count = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
     owner = relationship("User", back_populates="projects")
     tasks = relationship("ConversionTask", back_populates="project", cascade="all, delete-orphan")
@@ -54,7 +54,7 @@ class Project(Base):
 
 
 class ConversionTask(Base):
-    
+
     __tablename__ = "conversion_tasks"
 
     id = Column(String, primary_key=True, index=True)
@@ -65,8 +65,11 @@ class ConversionTask(Base):
     rationale = Column(Text, default="")
     status = Column(SQLEnum(TaskStatus), default=TaskStatus.PENDING, nullable=False)
     version = Column(Integer, default=1)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
     project = relationship("Project", back_populates="tasks")
     comments = relationship("Comment", back_populates="task", cascade="all, delete-orphan")
@@ -82,7 +85,7 @@ class Comment(Base):
     content = Column(Text, nullable=False)
     line_number = Column(Integer, nullable=True)
     resolved = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     task = relationship("ConversionTask", back_populates="comments")
 
@@ -95,10 +98,10 @@ class WorkflowStep(Base):
     project_id = Column(String, ForeignKey("projects.id"), nullable=False)
     name = Column(String, nullable=False)
     description = Column(Text, nullable=False)
-    status = Column(String, default="pending", nullable=False)  # pending, in-progress, completed, failed
+    status = Column(String, default="pending", nullable=False)
     order = Column(Integer, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
     project = relationship("Project", back_populates="workflow_steps")
 
@@ -114,7 +117,7 @@ class User(Base):
     api_key = Column(String, unique=True, nullable=False, index=True)
     monthly_request_limit = Column(Integer, default=1000, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     projects = relationship("Project", back_populates="owner", cascade="all, delete-orphan")
     usage_records = relationship("Usage", back_populates="user", cascade="all, delete-orphan")
@@ -129,7 +132,7 @@ class Usage(Base):
     year = Column(Integer, nullable=False)
     month = Column(Integer, nullable=False)
     request_count = Column(Integer, default=0, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
     user = relationship("User", back_populates="usage_records")

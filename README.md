@@ -1,38 +1,70 @@
-# Crewsastosparksql Crew
+# CrewSAS Translation API
 
-Welcome to the Crewsastosparksql Crew project, powered by [crewAI](https://crewai.com). This template is designed to help you set up a multi-agent AI system with ease, leveraging the powerful and flexible framework provided by crewAI. Our goal is to enable your agents to collaborate effectively on complex tasks, maximizing their collective intelligence and capabilities.
+SAS to PySpark/SQL translation service powered by [crewAI](https://crewai.com). Clean FastAPI implementation with authentication, rate limiting, and project management.
 
-## Installation
-Ensure you have Python >=3.10 <3.14 installed on your system. This project uses [UV](https://docs.astral.sh/uv/) for dependency management and package handling, offering a seamless setup and execution experience.
+## Quick Start
 
-First, if you haven't already, install uv:
+### 1. Installation
 
 ```bash
 pip install uv
-```
-
-```bash
 uv venv
 source .venv/bin/activate
 uv pip install -e .
 ```
 
-### Configuration
+### 2. Configuration
 
-Copy `.env.example` to `.env` and fill in your Azure OpenAI credentials:
+Copy `.env.example` to `.env` and configure:
 
 ```bash
 cp .env.example .env
 ```
 
-## Running the Project
+Required variables:
+- `SECRET_KEY` - JWT secret (already set)
+- `AZURE_OPENAI_API_KEY` - Azure OpenAI key
+- `AZURE_OPENAI_ENDPOINT` - Azure endpoint
+- `AZURE_OPENAI_API_VERSION` - API version
+- `AZURE_OPENAI_DEPLOYMENT` - Model deployment
+
+### 3. Initialize Database
 
 ```bash
-python -m crewsastosparksql.main path/to/file.sas
+uv run python -m crewsastosparksql.api.migrate_db
 ```
 
+### 4. Start API
+
 ```bash
-python -m crewsastosparksql.main examples/cars.sas
+uv run uvicorn crewsastosparksql.api.app:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### 5. Test
+
+```bash
+./test_api.sh
+```
+
+## API Endpoints
+
+```
+POST /api/auth/register              Register user
+POST /api/auth/login                 Login (returns JWT)
+POST /api/translate                  Quick translate (JSON)
+POST /api/translate/file             Translate .sas file
+POST /api/projects                   Create project
+POST /api/projects/{id}/files        Upload .sas files
+POST /api/projects/{id}/translate    Start translation
+GET  /api/dashboard                  Get metrics
+GET  /health                         Health check
+```
+
+## CLI Usage
+
+```bash
+uv run python -m crewsastosparksql.main path/to/file.sas
+uv run python -m crewsastosparksql.main examples/cars.sas
 ```
 
 ## Understanding Your Crew

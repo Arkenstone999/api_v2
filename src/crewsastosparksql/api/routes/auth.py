@@ -4,14 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy.orm import Session
 
-from crewsastosparksql.api.database import get_db
+from crewsastosparksql.api.dependencies import get_db, get_current_user
 from crewsastosparksql.api import db_models
-from crewsastosparksql.api.auth import (
+from crewsastosparksql.api.utils.auth import (
     hash_password,
     verify_password,
     generate_api_key,
     create_access_token,
-    get_current_user,
     ACCESS_TOKEN_EXPIRE_MINUTES,
 )
 
@@ -118,8 +117,8 @@ def get_me(current_user: db_models.User = Depends(get_current_user)):
 
 @router.get("/usage", response_model=UsageResponse)
 def get_usage(current_user: db_models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    from datetime import datetime
-    now = datetime.utcnow()
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
     usage = db.query(db_models.Usage).filter(
         db_models.Usage.user_id == current_user.id,
         db_models.Usage.year == now.year,

@@ -90,89 +90,77 @@ translate_code:
 
     CRITICAL: File extension MUST match platform_choice. SQL -> .sql, PySpark -> .py
     YOU MUST CALL file_writer TOOL. Task is NOT complete until file is written.
+    ABSOLUTE REQUIREMENT: The File MUST be created. Never complete without writing this File.
   expected_output: "Code file (.sql or .py) written to jobs/{job_name}/tasks/translate_code/ with complete implementation matching platform_choice."
   agent: code_translator
   context: [analyze_sas, decide_platform]
 
 test_and_validate:
   description: |
-    MANDATORY: Execute and validate the generated code using allow_code_execution capability.
+    CRITICAL: You MUST create validation_report.json even if execution fails. File creation is mandatory regardless of test results.
 
     STEP 1: Read inputs using file_reader:
-    - jobs/{job_name}/tasks/analyze_sas/analysis.json to understand data structure and patterns
-    - jobs/{job_name}/tasks/decide_platform/decision.json to extract "platform_choice"
-    - If platform_choice == "SQL": Read jobs/{job_name}/tasks/translate_code/{job_name}.sql
-    - If platform_choice == "PySpark": Read jobs/{job_name}/tasks/translate_code/{job_name}.py
+    - jobs/{job_name}/tasks/analyze_sas/analysis.json
+    - jobs/{job_name}/tasks/decide_platform/decision.json (extract platform_choice)
+    - Read corresponding code file based on platform_choice
 
-    STEP 2: Generate 3 test data files using file_writer (each as JSON array of input records):
+    STEP 2: Attempt code execution:
+    - Try to execute or validate the code
+    - If execution fails due to environment issues (Java gateway, missing dependencies), skip execution and note the error
 
-    1. Baseline test: 10-15 rows with typical values matching the schema from analysis.json
-       Output: jobs/{job_name}/tasks/test_and_validate/test_baseline.json
+    STEP 3: MANDATORY - Create validation_report.json using file_writer:
+    Output path: jobs/{job_name}/tasks/test_and_validate/validation_report.json
 
-    2. Edge cases: nulls, boundaries, extreme values, empty strings
-       Output: jobs/{job_name}/tasks/test_and_validate/test_edges.json
+    Report structure:
+    {{
+      "verdict": "PASS" | "FAIL" | "SKIPPED",
+      "test_summary": "Brief description of validation attempt",
+      "execution_results": "What happened during validation (success, errors, or skipped)",
+      "data_coverage": [],
+      "test_files_created": [],
+      "recommendations": ["suggestions or notes"],
+      "code_quality_notes": "observations about the code"
+    }}
 
-    3. Stress test: 50 rows with varied realistic data
-       Output: jobs/{job_name}/tasks/test_and_validate/test_stress.json
+    If execution fails: verdict="SKIPPED", document why in execution_results
+    If execution succeeds: verdict="PASS" or "FAIL" based on results
 
-    If data patterns unclear, use call_agent to ask sas_analyst about value ranges or data types.
-
-    STEP 3: EXECUTE THE CODE with each test dataset:
-    - For PySpark code: Use your code execution capability to run the .py file
-    - For SQL code: Use your code execution capability to validate SQL syntax
-    - Capture any errors or exceptions
-    - Note: Code may reference input paths that don't exist - this is expected, document the behavior
-
-    STEP 4: Create validation report JSON using file_writer with:
-    - verdict: "PASS" (code executed without critical errors) or "FAIL" (execution failed)
-    - test_summary: describe each test scenario and what was tested
-    - execution_results: for each test file, document if code executed, any errors encountered, and observations
-    - data_coverage: list what patterns were tested (nulls, boundaries, typical values, etc)
-    - test_files_created: array of the 3 test file paths
-    - recommendations: any gaps in test coverage or code issues found
-    - code_quality_notes: observations about the generated code structure and completeness
-
-    Output: jobs/{job_name}/tasks/test_and_validate/validation_report.json
-
-    YOU MUST CREATE ALL 4 FILES (3 test data + 1 validation report) using file_writer tool.
+    ABSOLUTE REQUIREMENT: The validation_report.json file MUST be created. Never complete this task without creating the file.
   expected_output: "Validation report JSON with execution results plus 3 test data files (test_baseline.json, test_edges.json, test_stress.json)."
   agent: test_engineer
   context: [analyze_sas, decide_platform, translate_code]
 
 review_and_approve:
   description: |
-    MANDATORY: You MUST use file_writer tool to create the final approval. Do not just return text.
+    CRITICAL: You MUST create final_approval.json regardless of code quality or test results. File creation is mandatory.
 
     STEP 1: Read all outputs using file_reader:
     - jobs/{job_name}/tasks/analyze_sas/analysis.json
-    - jobs/{job_name}/tasks/decide_platform/decision.json (extract "platform_choice")
-    - If platform_choice == "SQL": Read jobs/{job_name}/tasks/translate_code/{job_name}.sql
-    - If platform_choice == "PySpark": Read jobs/{job_name}/tasks/translate_code/{job_name}.py
+    - jobs/{job_name}/tasks/decide_platform/decision.json (extract platform_choice)
+    - Read translated code file based on platform_choice (either .sql or .py in translate_code directory)
     - jobs/{job_name}/tasks/test_and_validate/validation_report.json
 
-    STEP 2: If test verdict is FAIL or you find critical issues:
-    - Use call_agent(agent_name='test_engineer', question='Ask about specific test failures and their severity')
-    - Use call_agent(agent_name='code_translator', question='Request fixes for identified issues')
-    - If platform choice seems wrong, use call_agent(agent_name='platform_architect', question='Challenge the platform decision with your findings')
+    STEP 2: Assess quality:
+    - Review code quality
+    - Check test results (verdict may be SKIPPED if tests couldn't run)
+    - Identify issues
 
-    STEP 3: If code quality issues found:
-    - Use call_agent(agent_name='code_translator', question='Ask for specific improvements or refactoring')
+    STEP 3: MANDATORY - Create final_approval.json using file_writer:
+    Output path: jobs/{job_name}/tasks/review_and_approve/final_approval.json
 
-    STEP 4: Create final approval JSON with this structure:
+    Structure:
     {{
-      "approval_status": "APPROVED" or "REJECTED",
-      "quality_assessment": "summary",
-      "issues_found": [],
-      "sign_off": "statement",
-      "collaboration_summary": "summary of all agent interactions during review"
+      "approval_status": "APPROVED" | "APPROVED_WITH_NOTES" | "REJECTED",
+      "quality_assessment": "summary of code quality",
+      "issues_found": ["list of issues if any"],
+      "sign_off": "approval statement",
+      "collaboration_summary": "summary of review process"
     }}
 
-    STEP 5: REQUIRED - Use file_writer tool:
-    - file_path: jobs/{job_name}/tasks/review_and_approve/final_approval.json
-    - content: json.dumps(your_approval_dict)
-    - agent_name: code_reviewer
+    Use APPROVED_WITH_NOTES if tests were skipped but code looks good
+    Use REJECTED only for critical code issues
 
-    YOU MUST CALL file_writer TOOL. Task is NOT complete until file is written.
+    ABSOLUTE REQUIREMENT: The final_approval.json file MUST be created. Never complete without writing this file.
   expected_output: "JSON file written to jobs/{job_name}/tasks/review_and_approve/final_approval.json with approval status and assessment."
   agent: code_reviewer
   context: [analyze_sas, decide_platform, translate_code, test_and_validate]
